@@ -1,6 +1,7 @@
 library IEEE;
 use IEEE.Std_logic_1164.all;
 use IEEE.Numeric_Std.all;
+use std.textio.all;
 
 entity FIR_MAC_tb is
 end;
@@ -39,10 +40,28 @@ architecture bench of FIR_MAC_tb is
     signal m_axis_tvalid: std_logic;
     signal m_axis_tready: std_logic;
     signal m_axis_tlast: std_logic ;
+    
+    signal ena : std_logic := '0';
+    signal value1_std_logic_24_bit : std_logic_vector(23 downto 0) := ( others => '0');
+    signal value2_std_logic_24_bit : std_logic_vector(23 downto 0) := ( others => '0');
+    signal file_in_end : boolean := false;
+    
+    
+    constant tolerance : signed(23 downto 0) := to_signed(2,24);
+    signal enb : std_logic := '0';
+    signal value1_std_logic_24_bit_out : std_logic_vector(23 downto 0) := ( others => '0');
+    signal value1_up_out               : std_logic_vector(23 downto 0) := ( others => '0');
+    signal value1_down_out             : std_logic_vector(23 downto 0) := ( others => '0');
+    signal value2_std_logic_24_bit_out : std_logic_vector(23 downto 0) := ( others => '0');
+    signal value2_up_out               : std_logic_vector(23 downto 0) := ( others => '0');
+    signal value2_down_out             : std_logic_vector(23 downto 0) := ( others => '0');
+    signal file_out_end : boolean := false;
 
     constant clock_period: time := 10 ns ;
-    constant data_gap    : time := 150 ns;
+    constant data_gap    : time := 15 * clock_period;
     signal stop_the_clock: boolean;
+    
+    signal err_cnt : unsigned(15 downto 0) := ( others => '0');
 
 begin
 
@@ -60,12 +79,97 @@ begin
                  m_axis_tready    => m_axis_tready,
                  m_axis_tlast     => m_axis_tlast );
 
+    read_in_p : process (clk, rst) is
+    ---------------------------------------------------------------------------------------------------------
+    
+    constant NUM_COL                : integer := 2;   -- number of column of file
+    
+    type t_integer_array       is array(integer range <> )  of integer;
+    file test_vector                : text open read_mode is "input_file.txt";
+    variable row                    : line;
+    variable v_data_read            : t_integer_array(1 to NUM_COL);
+    variable v_data_row_counter     : integer := 0;
+
+    -----------------------------------------------------------------------------------------------------------
+    begin
+        if(rst='1') then
+            v_data_row_counter     := 0;
+            v_data_read            := (others=> -1);
+    ------------------------------------
+        elsif(rising_edge(clk)) then
+        
+            if (endfile(test_vector)) then
+                file_in_end <= true;
+            end if;
+    
+            if(ena = '1') then  -- external enable signal
+            
+            -- read from input file in "row" variable
+              if(not endfile(test_vector)) then
+                v_data_row_counter := v_data_row_counter + 1;
+                readline(test_vector,row);
+              end if;
+            
+            -- read integer number from "row" variable in integer array
+              for kk in 1 to NUM_COL loop
+                read(row,v_data_read(kk));
+              end loop;
+              value1_std_logic_24_bit    <= std_logic_vector(to_signed(v_data_read(1),24));
+              value2_std_logic_24_bit    <= std_logic_vector(to_signed(v_data_read(2),24));
+        end if;
+        
+      end if;
+    end process read_in_p;
+    
+    read_out_p : process (clk, rst) is
+    ---------------------------------------------------------------------------------------------------------
+    
+    constant NUM_COL                : integer := 2;   -- number of column of file
+    
+    type t_integer_array       is array(integer range <> )  of integer;
+    file test_vector                : text open read_mode is "output_file.txt";
+    variable row                    : line;
+    variable v_data_read            : t_integer_array(1 to NUM_COL);
+    variable v_data_row_counter     : integer := 0;
+
+    -----------------------------------------------------------------------------------------------------------
+    begin
+        if(rst='1') then
+            v_data_row_counter     := 0;
+            v_data_read            := (others=> -1);
+    ------------------------------------
+        elsif(rising_edge(clk)) then
+    
+            if(enb = '1') then  -- external enable signal
+            
+            -- read from input file in "row" variable
+              if(not endfile(test_vector)) then
+                v_data_row_counter := v_data_row_counter + 1;
+                readline(test_vector,row);
+              else
+                file_out_end <= true;
+              end if;
+            
+            -- read integer number from "row" variable in integer array
+              for kk in 1 to NUM_COL loop
+                read(row,v_data_read(kk));
+              end loop;
+              value1_std_logic_24_bit_out    <= std_logic_vector(to_signed(v_data_read(1),24));
+              value2_std_logic_24_bit_out    <= std_logic_vector(to_signed(v_data_read(2),24));
+        end if;
+        
+      end if;
+    end process read_out_p;
+    
     stimulus: process
+    
     begin
 
         -- Put initialisation code here
         stop_the_clock <= false;
         rst <= '0';
+        ena <= '0';
+        enb <= '0';
         s_axis_tdata  <= ( others => '0') ;
         s_axis_tvalid <= '0';
         s_axis_tlast  <= '0';
@@ -74,99 +178,78 @@ begin
 
         -- Put test bench stimulus code here
         m_axis_tready <= '1';
-
-        s_axis_tdata  <= ( others => '0') ;
-        s_axis_tvalid <= '1';
-        s_axis_tlast  <= '0';
-        wait for 10 ns;
-        s_axis_tdata  <= ( others => '0') ;
-        s_axis_tvalid <= '0';
-        s_axis_tlast  <= '0';
-        wait for data_gap;
-        s_axis_tdata  <= ( others => '0') ;
-        s_axis_tvalid <= '1';
-        s_axis_tlast  <= '1';
-        wait for 10 ns;
-        s_axis_tdata  <= ( others => '0') ;
-        s_axis_tvalid <= '0';
-        s_axis_tlast  <= '0';
-        wait for data_gap;
-
-        s_axis_tdata  <=  x"00004000" ;
-        s_axis_tvalid <= '1';
-        s_axis_tlast  <= '0';
-        wait for 10 ns;
-        s_axis_tdata  <=  x"00004000"  ;
-        s_axis_tvalid <= '0';
-        s_axis_tlast  <= '0';
-        wait for data_gap;
-        s_axis_tdata  <=  x"00004000" ;
-        s_axis_tvalid <= '1';
-        s_axis_tlast  <= '1';
-        wait for 10 ns;
-        s_axis_tdata  <=  x"00004000"  ;
-        s_axis_tvalid <= '0';
-        s_axis_tlast  <= '0';
-        wait for data_gap;
-
-        s_axis_tdata  <=  x"00008000"  ;
-        s_axis_tvalid <= '1';
-        s_axis_tlast  <= '0';
-        wait for 10 ns;
-        s_axis_tdata  <=  x"00008000"  ;
-        s_axis_tvalid <= '0';
-        s_axis_tlast  <= '0';
-        wait for data_gap;
-        s_axis_tdata  <=  x"00008000" ;
-        s_axis_tvalid <= '1';
-        s_axis_tlast  <= '1';
-        wait for 10 ns;
-        s_axis_tdata  <=  x"00008000"  ;
-        s_axis_tvalid <= '0';
-        s_axis_tlast  <= '0';
-        wait for data_gap;
-
-        s_axis_tdata  <=  x"0000f000"  ;
-        s_axis_tvalid <= '1';
-        s_axis_tlast  <= '0';
-        wait for 10 ns;
-        s_axis_tdata  <=  x"0000f000"  ;
-        s_axis_tvalid <= '0';
-        s_axis_tlast  <= '0';
-        wait for data_gap;
-        s_axis_tdata  <=  x"0000f000" ;
-        s_axis_tvalid <= '1';
-        s_axis_tlast  <= '1';
-        wait for 10 ns;
-        s_axis_tdata  <=  x"0000f000"  ;
-        s_axis_tvalid <= '0';
-        s_axis_tlast  <= '0';
-        wait for data_gap;
-
-        for i in 0 to 100 loop
-            s_axis_tdata  <=  x"0000f000"  ;
+        
+        while (not file_in_end) loop
+            ena <= '1';
+            enb <= '1';
+            wait for clock_period;
+            ena <= '0';
+            enb <= '0';
+            
+            s_axis_tdata  <= X"00" & value1_std_logic_24_bit ;
             s_axis_tvalid <= '1';
             s_axis_tlast  <= '0';
-            wait for 10 ns;
-            s_axis_tdata  <=  x"0000f000"  ;
+            wait for clock_period;
+            s_axis_tdata  <= ( others => '0') ;
             s_axis_tvalid <= '0';
             s_axis_tlast  <= '0';
             wait for data_gap;
-            s_axis_tdata  <=  x"0000f000" ;
+            s_axis_tdata  <= X"00" & value2_std_logic_24_bit ;
             s_axis_tvalid <= '1';
             s_axis_tlast  <= '1';
-            wait for 10 ns;
-            s_axis_tdata  <=  x"0000f000"  ;
+            wait for clock_period;
+            s_axis_tdata  <= ( others => '0') ;
             s_axis_tvalid <= '0';
             s_axis_tlast  <= '0';
+            
+            exit when file_in_end;
+            
             wait for data_gap;
+            
         end loop;
-
-
-        stop_the_clock <= true;
+        
+        report "Total errors found = " & integer'image(to_integer(err_cnt));
+        
+        if file_in_end then
+            stop_the_clock <= true;
+        end if;
+        
         wait;
     end process;
-
+    
+    value1_up_out   <= std_logic_vector(signed(value1_std_logic_24_bit_out) + tolerance);
+    value1_down_out <= std_logic_vector(signed(value1_std_logic_24_bit_out) - tolerance);
+    value2_up_out   <= std_logic_vector(signed(value2_std_logic_24_bit_out) + tolerance);
+    value2_down_out <= std_logic_vector(signed(value2_std_logic_24_bit_out) - tolerance);
+    
+    check_data_p : process (clk) is
+    begin
+    
+        if(rising_edge(clk)) then
+            if (m_axis_tvalid = '1' and m_axis_tlast = '0') then
+                if (signed(m_axis_tdata(23 downto 0)) < signed(value1_down_out))then
+                    report "Left output does not match, expected " & integer'image(to_integer(signed(value1_std_logic_24_bit_out))) 
+                    & " got " & integer'image(to_integer(signed(m_axis_tdata(23 downto 0)))) severity warning;
+                    err_cnt <= err_cnt + X"0001";
+                elsif (signed(m_axis_tdata(23 downto 0)) > signed(value1_up_out)) then
+                    report "Left output does not match, expected " & integer'image(to_integer(signed(value1_std_logic_24_bit_out))) 
+                    & " got " & integer'image(to_integer(signed(m_axis_tdata(23 downto 0)))) severity warning;
+                    err_cnt <= err_cnt + X"0001";
+                end if;
+            elsif (m_axis_tvalid = '1' and m_axis_tlast = '1') then
+                if (signed(m_axis_tdata(23 downto 0)) < signed(value2_down_out))then
+                    report "Right output does not match, expected " & integer'image(to_integer(signed(value2_std_logic_24_bit_out))) 
+                    & " got " & integer'image(to_integer(signed(m_axis_tdata(23 downto 0)))) severity warning;
+                    err_cnt <= err_cnt + X"0001";
+                elsif (signed(m_axis_tdata(23 downto 0)) > signed(value2_up_out)) then
+                    report "Right output does not match, expected " & integer'image(to_integer(signed(value2_std_logic_24_bit_out))) 
+                    & " got " & integer'image(to_integer(signed(m_axis_tdata(23 downto 0)))) severity warning;
+                    err_cnt <= err_cnt + X"0001";
+                end if;
+            end if;
+        end if;
+    
+    end process;
     clocking: process
     begin
         while not stop_the_clock loop
