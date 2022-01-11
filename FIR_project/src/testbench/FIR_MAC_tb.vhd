@@ -223,10 +223,16 @@ begin
     value2_down_out <= std_logic_vector(signed(value2_std_logic_24_bit_out) - tolerance);
     
     check_data_p : process (clk) is
+        ---------------------------------------------------------------------------------------------------------
+
+        file test_vector                : text open write_mode is "output_file_fir.txt";
+        variable row                    : line;
+        -----------------------------------------------------------------------------------------------------------
     begin
-    
+
         if(rising_edge(clk)) then
             if (m_axis_tvalid = '1' and m_axis_tlast = '0') then
+                value1_fir_24_bit_out <= m_axis_tdata(23 downto 0);
                 if (signed(m_axis_tdata(23 downto 0)) < signed(value1_down_out))then
                     report "Left output does not match, expected " & integer'image(to_integer(signed(value1_std_logic_24_bit_out))) 
                     & " got " & integer'image(to_integer(signed(m_axis_tdata(23 downto 0)))) severity warning;
@@ -237,6 +243,10 @@ begin
                     err_cnt <= err_cnt + X"0001";
                 end if;
             elsif (m_axis_tvalid = '1' and m_axis_tlast = '1') then
+                write(row, to_integer(signed(value1_fir_24_bit_out))    , right, 15);
+                write(row, to_integer(signed(m_axis_tdata(23 downto 0))), right, 15);
+                writeline(test_vector,row);
+                value2_fir_24_bit_out <= m_axis_tdata(23 downto 0);
                 if (signed(m_axis_tdata(23 downto 0)) < signed(value2_down_out))then
                     report "Right output does not match, expected " & integer'image(to_integer(signed(value2_std_logic_24_bit_out))) 
                     & " got " & integer'image(to_integer(signed(m_axis_tdata(23 downto 0)))) severity warning;
@@ -248,8 +258,10 @@ begin
                 end if;
             end if;
         end if;
-    
+
     end process;
+    
+    
     clocking: process
     begin
         while not stop_the_clock loop
