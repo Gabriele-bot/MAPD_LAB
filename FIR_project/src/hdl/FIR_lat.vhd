@@ -38,9 +38,13 @@ architecture RTL of FIR_lat is
     constant coeff : coeff_array := (1915, 5389, 8266, 9979, 8266, 5389, 1915);
     -- FIR filter, lpf fl-->4.8 kHz, att -30 db, 7 taps
 
-    type res_mult_array is array (6 downto 0) of signed(AUDIO_DATA_WIDTH+16-1 downto 0);
-    signal mult_reg_l : res_mult_array;
-    signal mult_reg_r : res_mult_array;
+    type mult_res_array is array (6 downto 0) of signed(AUDIO_DATA_WIDTH+16-1 downto 0);
+    signal mult_reg_l : mult_res_array := (others=>(others=>'0'));
+    signal mult_reg_r : mult_res_array := (others=>(others=>'0'));
+    
+    type add_res_array is array (5 downto 0) of signed(AUDIO_DATA_WIDTH+16-1 downto 0);
+    signal add_reg_l  : add_res_array := (others=>(others=>'0'));
+    signal add_reg_r  : add_res_array := (others=>(others=>'0'));
 
 
     type data_array is array (0 to 1) of signed(AUDIO_DATA_WIDTH+16-1 downto 0);
@@ -172,6 +176,7 @@ begin
                 mult_reg_r(4) <= audio_data_shift_r(4) * to_signed(coeff(4), 16);
                 mult_reg_r(5) <= audio_data_shift_r(5) * to_signed(coeff(5), 16);
                 mult_reg_r(6) <= audio_data_shift_r(6) * to_signed(coeff(6), 16);
+                
 
             elsif (s_new_packet_r(1) = '1') then
 
@@ -183,6 +188,7 @@ begin
             end if;
         end if;
     end process;
+    
 
     process (clk) is
     begin

@@ -22,7 +22,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module axis_i2s2 (
-    input  wire        axis_clk, // 12.288MHz
+    input  wire        axis_clk, // ~24.576MHz
     input  wire        axis_resetn,
     
     input  wire [31:0] tx_axis_s_data,
@@ -50,8 +50,8 @@ module axis_i2s2 (
     always@(posedge axis_clk)
         count <= count + 1;
     
-    wire lrck = count[7]; // 12.288MHz / 2^8 = 48 kHz
-    wire sclk = count[1]; // 12.288MHz / 2^2 = 3.096 MHz
+    wire lrck = count[8]; // 24.576MHz / 2^9 = ~48 kHz
+    wire sclk = count[2]; // 24.576MHz / 2^3 = ~3.072 MHz
     wire mclk = axis_clk;
     assign tx_lrck = lrck;
     assign tx_sclk = sclk;
