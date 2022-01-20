@@ -8,19 +8,21 @@
 
 \begin{document}
 
-\author{Mario Rossi\\123456  \and Mario Rossi\\123456 \and Mario Rossi\\123456 \and Mario Rossi\\123456}
+\author{Sebastiano Monti\\2052399  \and Gabriele Brotolato\\2019062 \and Mario Rossi\\123456 \and Mario Rossi\\123456}
 \title{\textbf{Management and Analysis of Physics Dataset (mod. A): \\ Hardware accelerated FIR filter and application to an audio stream}}
 \maketitle
 
 \section{Aim}
-In this project shows and implementation of a FIR filter in FPGA, two different architecture were used. In particular, it's used the Digilent stereo audio PMOD with I$^2$S protocol for communication with the FPGA board and a ADC/DAC ICs. The modules produced were tested in simulations with Python generated input and output along the hardware validation with real word audio samples.
+In this project we show an implementation of a FIR filter on an ARTY A7 FPGA, using two different architectures. For this purpose, a Digilent stereo audio Pmod I2S2 module has been used, together with I$^2$S protocol for communication with the FPGA board and an ADC/DAC ICs. 
+
+Produced modules have been tested using Python simulations, where we generated a wave form input, together with the expected output. In addition, hardware validation has been provided using real world audio samples, analyzed through an oscilloscope.
 
 
 
 
 
 \section{Implementation}
-The modules used are listed below and the block diagram shows the various connections.
+The used modules are listed below and the block diagram shows the various connections.
 \begin{itemize}
     \item I$^2$S/AXIS interface;
     \item AXIS FIFO;
@@ -39,19 +41,17 @@ Fig.\ref{fig:Block_diagram}.
 \end{figure}
 \vspace{1cm}
 
-Now, we describe in details the structure of the main components..
+In the next sections, we describe in details the structure of the main components.
 
 \subsection{I$^2$S to AXIS interface}
-This module will take as input the serial data with the I$^2$S protocol and it translates it to an AXI-Stream with the tlast flag used as selector between left and right channel.  
-
-This module will also encode the AXI-Stream to I$^2$S protocol.  
+The Digilent Pmod I2S2 features an audio A/D converter and a stereo D/A converter, each connected to one of two audio jacks. These circuits allow the FPGA to transmit and receive stereo audio signals via the I$^2$S protocol. In particular, input signals are translated to an AXI-Stream (encoded into the I$^2$S protocol) with the last flag used as a selector between left and right channel. The Pmod I2S2 supports 24 bit resolution per channel at input sample rates up to 108 kHz and output sample rates up to 200 kHz.
 
 More on this module can be found on the Digilent website \cite{Digilent}. 
 
 \subsection{FIR filter}
-We implement a finite impulse response (FIR) filter, which is a filter whose impulse response is of finite duration, this module is AXI-Stream compliant and input and output FIFO are added.
+We implement a finite impulse response (FIR) filter, which is a filter whose impulse response is of finite duration. This module is AXI-Stream compliant and input and output FIFO are added.
 %%%
-Firstly, we provide a brief mathematical introduction. Given a sequence $\{x_i\}_{i=1,\dots,N}$ of $N$ input data samples, the output sequence of the filter is obtained by applying the following operation:
+We firstly provide a brief mathematical introduction. Given a sequence $\{x_i\}_{i=1,\dots,N}$ of $N$ input data samples, the output sequence of the filter is obtained by applying the following operation:
 \begin{equation}
     \begin{aligned}
         y[n] &=b_{0} x[n]+b_{1} x[n-1]+\cdots+b_{k-1} x[n-k+1] \\
@@ -78,9 +78,10 @@ The values of the coefficients are (16 bits signed integer format):
 \end{align*}
 
 \subsubsection{Latency architecture}
-This implementation is mainly focussed to reduce the latency of the filter, to do so a pipelined data flow is employed.
+This implementation is mainly focused to reduce the latency of the filter. To do so, a pipelined data flow has been employed.
 %%%
-Firstly let's consider the shift register that will store the last seven inputs of the data stream, this is implemented using a cascade of D flip-flops.
+First of all, we implemented a shift register that stores the last seven inputs of the data stream, using a cascade of D flip-flops.
+
 \begin{lstlisting}[style={VHDL-style}]
 shift_reg_p : process (clk) is
     begin
@@ -109,7 +110,7 @@ shift_reg_p : process (clk) is
     end process shift_reg_p;
 \end{lstlisting}
 
-When the data are stored the multiplication can take place, here the whole 7 samples are processed, and finally on the following clock cycle the addition is performed.
+When the data are stored, the multiplication can take place. Here the whole 7 samples are processed, and finally, on the following clock cycle, the addition is performed.
 
 \begin{lstlisting}[style={VHDL-style}]
 process (clk) is
@@ -143,14 +144,14 @@ begin
 end process;
 \end{lstlisting}
 
-From the code above it is clear that in two clock cycles the data are processed, but the price in resources is very high, in this particular case 14 DSP blocks are used (the ARTY A/ 35T has 90 DSPs).
+From the code above it is clear that in two clock cycles the data are processed, but the price in resources is very high. In this particular case, 14 DSP blocks are used (the ARTY A/ 35T has got 90 DSPs).
 
 %% table with resources utilization
 
-\subsubsection{Multiplication and ACcumulation (MAC) architecture}
+\subsubsection{Multiplication and Accumulation (MAC) architecture}
 
-In this acrhitecture the principle is the same, but the accumulation in split in seven different steps. In our case it is used a FSM that will muliply and accumulate all the seven steps.  
-in this way only 2 DPSs are needed at the cost of increased latency, in partucular 7 clock cyles per data.
+In this second architecture, the principle remains the same, but the accumulation is split in seven different steps. In our case, we used a FSM that multiplies and accumulates all the seven steps.  
+In this way, only 2 DSPs are needed, at the cost of increased latency, in particular 7 clock cycles per data.
 
 \begin{lstlisting}[style={VHDL-style}]
 MAC_p : process (clk, rst) is
@@ -220,7 +221,7 @@ end process MAC_p;
 
 \subsection{Testbench validation}
 
-The produced modules were validate via simulation. In the testbench the input array is read from file and sent to the FIR filter, later the result are first compared with a file result and then write back to another file.  
+At this point, the produced modules have been validated via simulation. In the testbench, the input array is read from a file and then sent to the FIR filter. Subsequently, the obtained results are firstly compared with a file containing the values calculated using Python and then written back to another file.  
 
 A snippet of the code is given below.
 
@@ -266,7 +267,7 @@ begin
 end process;
 \end{lstlisting}
 
-Due to rounding methods some of the VHDL simulation output values weren't coherent with the Python values, so a tolerance is implemented (in this case a tolerance of 2 was selected).
+Due to rounding methods, some output values of the VHDL simulation weren't coherent with the ones calculated using Python. For this reason a tolerance has been implemented (in this case a tolerance of 2 was selected).
 
 \begin{figure}[!h]
     \centering
@@ -284,10 +285,24 @@ Due to rounding methods some of the VHDL simulation output values weren't cohere
 
 \subsection{Real-world validation}
 
+The filter has been finally tested with real audio data samples. In particular, 31 different frequencies were sent to the FPGA and the output RMS values have been measured with an oscilloscope.  
+
+The output has been then rescaled computing the logarithm, in order to match the simulation data. The values in mV and dB are given in the table below.
+
+\begin{figure}[!h]
+    \centering
+    \includegraphics[width=1.0\textwidth]{images/real_wolrd_plot_log.pdf}
+    \caption{FIR filter response with different input sine wave frequencies}
+    \label{fig:FIR_real-wolrd}
+\end{figure}
+
+From plot \ref{fig:FIR_real-wolrd}, it is clear that the filter responds as expected, but at higher frequencies the oscilloscope's resolution hides the real filter's behaviour.
+
+% table here
 
 
 \section{Conclusion}
-In this assignment we present two different architectures of a FIR filter implemented in FPGA hardware. We exploit I$^2$S protocol and modules provided by Digilent to exchange and sample the audio stream.
+In this assignment we presented two different architectures of a FIR filter, implemented in FPGA hardware. We also exploited I$^2$S protocol and modules provided by Digilent to exchange and sample the audio stream.
 
 \begin{thebibliography}{99}
     
